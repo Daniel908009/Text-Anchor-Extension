@@ -9,30 +9,43 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
             return;
         }
         displayMessage("Text anchor added.");
-        let startPath = getXPath(range.startContainer);
-        let endPath = getXPath(range.endContainer);
-        const anchorKey = window.location.origin + window.location.pathname;
-        let anchors = await chrome.storage.local.get(`${anchorKey}`);
-        anchors = anchors[anchorKey] ? { textAnchors: anchors[anchorKey] } : { textAnchors: [] };
-        anchors.textAnchors.push({ text: text, startXpath: startPath, endXpath: endPath, range: { startOffset: range.startOffset, endOffset: range.endOffset } });
-        await chrome.storage.local.set({ [anchorKey]: anchors.textAnchors });
+        try {
+            let startPath = getXPath(range.startContainer);
+            let endPath = getXPath(range.endContainer);
+            const anchorKey = window.location.origin + window.location.pathname;
+            let anchors = await chrome.storage.local.get(`${anchorKey}`);
+            anchors = anchors[anchorKey] ? { textAnchors: anchors[anchorKey] } : { textAnchors: [] };
+            anchors.textAnchors.push({ text: text, startXpath: startPath, endXpath: endPath, range: { startOffset: range.startOffset, endOffset: range.endOffset } });
+            await chrome.storage.local.set({ [anchorKey]: anchors.textAnchors });
+        } catch (e) {
+            displayMessage("Error saving text anchor: " + e.message);
+        }
     }
     else if (message.action === "showTextAnchor") {
         let anchor = message.anchor;
-        let startElement = document.evaluate(anchor.startXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        let endElement = document.evaluate(anchor.endXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        if (startElement && endElement) {
-            let range = document.createRange();
-            range.setStart(startElement, anchor.range.startOffset);
-            range.setEnd(endElement, anchor.range.endOffset);
-            let selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-            let rect = range.getBoundingClientRect();
-            window.scrollTo({ top: rect.top + window.scrollY - window.innerHeight / 2, behavior: 'smooth' });
-            displayMessage("Text anchor located and highlighted.");   
-        } else {
-            displayMessage("Failed to locate the text anchor on this page.");
+        try {
+            let startElement = document.evaluate(anchor.startXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            let endElement = document.evaluate(anchor.endXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (startElement && endElement) {
+                let range = document.createRange();
+                range.setStart(startElement, anchor.range.startOffset);
+                range.setEnd(endElement, anchor.range.endOffset);
+                let selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                let text = selection.toString();
+                if (text !== anchor.text) {
+                    displayMessage("The text anchor could not be accurately located (text mismatch).");
+                    return;
+                }
+                let rect = range.getBoundingClientRect();
+                window.scrollTo({ top: rect.top + window.scrollY - window.innerHeight / 2, behavior: 'smooth' });
+                displayMessage("Text anchor located and highlighted.");   
+            } else {
+                displayMessage("Failed to locate the text anchor on this page.");
+            }
+        } catch (e) {
+            displayMessage("Error locating text anchor: " + e.message);
         }
     }
 });
