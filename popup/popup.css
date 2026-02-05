@@ -2,5 +2,62 @@ h1 {
     text-align: center;
 }
 html, body {
-    width: 300px;
+    min-width: 380px;
+}
+.delAllButton {
+    background-color: rgb(229, 6, 6);
+    color: white;
+    min-height: 35px;
+}
+.delAllButton:hover {
+    background-color: rgb(179, 0, 0);
+}
+.deleteButton {
+    background-color: rgb(229, 106, 6);
+    color: white;
+}
+.deleteButton:hover {
+    background-color: rgb(179, 76, 0);
+}
+button {
+    border-radius: 5px;
+    margin: 5px;
+    min-height: 20px;
+    min-width: 60px;
+    cursor: pointer;
+    font-size: larger;
+}
+li {
+    display: inline-flex;
+}
+.showButton {
+    background-color: rgb(9, 219, 219);
+    color: black;
+}
+.showButton:hover {
+    background-color: rgb(0, 179, 179);
+}
+p {
+    font-size: larger;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 170px;
+}
+.controlButtons {
+    display: flex;
+    justify-content: right;
+}
+.container {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    overflow-y: auto;
+}
+.copyButton {
+    background-color: rgb(100, 200, 100);
+    color: black;
+}
+.copyButton:hover {
+    background-color: rgb(50, 150, 50);
 }

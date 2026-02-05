@@ -7,7 +7,6 @@ function deleteAllTextAnchors() {
         if (activeTab) {
             const anchorKey = new URL(activeTab.url).origin + new URL(activeTab.url).pathname;
             chrome.storage.local.remove(anchorKey, () => {
-                console.log("All text anchors deleted for", anchorKey);
                 loadAnchors();
             });
         }
@@ -15,10 +14,6 @@ function deleteAllTextAnchors() {
 }
 
 deleteAllBtn.addEventListener("click", deleteAllTextAnchors);
-
-function shortenedText(text) {
-    return text.length > 30 ? text.substring(0, 27) + "..." : text;
-}
 
 async function loadAnchors() {
     let anchorKey;
@@ -34,29 +29,55 @@ async function loadAnchors() {
         list.innerHTML = "";
         anchors.textAnchors.forEach((anchor, index) => {
             const li = document.createElement("li");
-            li.textContent = `Anchor ${index + 1}: ${shortenedText(anchor.text)}`;
-            let button = document.createElement("button");
-            button.textContent = "Show";
-            button.addEventListener("click", () => {
-                chrome.tabs.sendMessage(activeTab.id, { action: "showTextAnchor", anchor: anchor });
+            let p = document.createElement("p");
+            p.textContent = `${index + 1}. ${anchor.text}`;
+            li.appendChild(p);
+            let showButton = document.createElement("button");
+            showButton.classList.add("showButton");
+            showButton.textContent = "Show";
+            showButton.addEventListener("click", async () => {
+                try {
+                    await chrome.tabs.sendMessage(activeTab.id, { action: "showTextAnchor", anchor: anchor });
+                } catch {
+                    try {
+                        await chrome.scripting.executeScript({
+                            target: { tabId: activeTab.id },
+                            files: ["content/content.js"]
+                        });
+                        await chrome.tabs.sendMessage(activeTab.id, { action: "showTextAnchor", anchor: anchor });
+                    } catch (e) {
+                        console.error("Failed to inject content script or send message:", e);
+                    }
+                }
             });
-            li.appendChild(button);
+            li.appendChild(showButton);
+            let copyButton = document.createElement("button");
+            copyButton.classList.add("copyButton");
+            copyButton.textContent = "Copy";
+            copyButton.addEventListener("click", () => {
+                navigator.clipboard.writeText(anchor.text).catch((err) => {
+                    console.error("Could not copy text: ", err);
+                });
+            });
+            li.appendChild(copyButton);
+            let deleteButton = document.createElement("button");
+            deleteButton.classList.add("deleteButton");
+            deleteButton.textContent = "Delete";
+            deleteButton.addEventListener("click", async () => {
+                await chrome.storage.local.get(anchorKey, async (res) => {
+                    let updatedAnchors = res[anchorKey] ? res[anchorKey] : [];
+                    updatedAnchors.splice(index, 1);
+                    await chrome.storage.local.set({ [anchorKey]: updatedAnchors });
+                });
+            });
+            li.appendChild(deleteButton);
             list.appendChild(li);
         });
     });
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-    let anchorKey;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab) {
-            anchorKey = new URL(activeTab.url).origin + new URL(activeTab.url).pathname;
-        }
-    });
-    if (area === "local" && changes[anchorKey]) {
-        loadAnchors();
-    }
+    loadAnchors();
 });
 
 document.addEventListener("DOMContentLoaded", loadAnchors);

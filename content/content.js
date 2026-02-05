@@ -4,46 +4,96 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         let range = null;
         if (text) {
             range = window.getSelection().getRangeAt(0);
-            //console.log("Selected range:", range);
-            if (range.startContainer !== range.endContainer) {
-                alert("Please select text within a single element."); // later I should replace this with a content popup message
-                return;
-            }
         }else {
-            alert("Please select some text to create an anchor.");
+            displayMessage("Please select some text to create an anchor.");
             return;
         }
-        let xpath = getXPathForElement(range.startContainer);
-        //console.log("Adding text anchor:", text, xpath, range);
+        displayMessage("Text anchor added.");
+        let startPath = getXPath(range.startContainer);
+        let endPath = getXPath(range.endContainer);
         const anchorKey = window.location.origin + window.location.pathname;
         let anchors = await chrome.storage.local.get(`${anchorKey}`);
         anchors = anchors[anchorKey] ? { textAnchors: anchors[anchorKey] } : { textAnchors: [] };
-        anchors.textAnchors.push({ text: text, xpath: xpath , range: range});
+        anchors.textAnchors.push({ text: text, startXpath: startPath, endXpath: endPath, range: { startOffset: range.startOffset, endOffset: range.endOffset } });
         await chrome.storage.local.set({ [anchorKey]: anchors.textAnchors });
     }
     else if (message.action === "showTextAnchor") {
-        console.log("text anchor")
+        let anchor = message.anchor;
+        let startElement = document.evaluate(anchor.startXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        let endElement = document.evaluate(anchor.endXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        if (startElement && endElement) {
+            let range = document.createRange();
+            range.setStart(startElement, anchor.range.startOffset);
+            range.setEnd(endElement, anchor.range.endOffset);
+            let selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            let rect = range.getBoundingClientRect();
+            window.scrollTo({ top: rect.top + window.scrollY - window.innerHeight / 2, behavior: 'smooth' });
+            displayMessage("Text anchor located and highlighted.");   
+        } else {
+            displayMessage("Failed to locate the text anchor on this page.");
+        }
     }
 });
 
-function getXPathForElement(element) {
-    let parts = [];
-    if (element.nodeType === Node.TEXT_NODE) {
-        element = element.parentNode;
-    }
-    while (element && element.nodeType === Node.ELEMENT_NODE) {
+function getXPath(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
         let index = 1;
-        let sibling = element.previousSibling;
+        let sibling = node.previousSibling;
+
         while (sibling) {
-            if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === element.nodeName) {
+            if (sibling.nodeType === Node.TEXT_NODE) {
                 index++;
             }
             sibling = sibling.previousSibling;
         }
-        let tagName = element.nodeName.toLowerCase();
-        let part = tagName + (index > 1 ? `[${index}]` : '');
-        parts.unshift(part);
-        element = element.parentNode;
+
+        return getXPath(node.parentNode) + `/text()[${index}]`;
     }
-    return '/' + parts.join('/');
+
+    if (node.nodeType === Node.ELEMENT_NODE) {
+        let index = 1;
+        let sibling = node.previousSibling;
+
+        while (sibling) {
+            if (
+                sibling.nodeType === Node.ELEMENT_NODE &&
+                sibling.nodeName === node.nodeName
+            ) {
+                index++;
+            }
+            sibling = sibling.previousSibling;
+        }
+
+        return getXPath(node.parentNode) + `/${node.nodeName.toLowerCase()}[${index}]`;
+    }
+
+    return "";
+}
+
+let currentMessage = null;
+function displayMessage(msg) {
+    let toast = document.createElement("div");
+    toast.textContent = msg;
+    toast.style.position = "fixed";
+    toast.style.top = "20px";
+    toast.style.left = "10px";
+    toast.style.padding = "10px";
+    toast.style.backgroundColor = "rgba(0, 0, 0, 1)";
+    toast.style.color = "white";
+    toast.style.borderRadius = "5px";
+    toast.style.zIndex = "10000";
+    if (currentMessage) {
+        try {
+            document.body.removeChild(currentMessage);
+        } catch (e) {}
+    }
+    document.body.appendChild(toast);
+    currentMessage = toast;
+    setTimeout(() => {
+        try {
+            document.body.removeChild(toast);
+        } catch (e) {}
+    }, 3000);
 }
