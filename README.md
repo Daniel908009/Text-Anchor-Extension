@@ -28,3 +28,4 @@ You can view or change the extension keyboard shortcuts in `chrome://extensions/
 Note: This extension cannot run on certain restricted pages (such as browser settings, new tabs, or internal browser pages) because these do not allow extensions to inject scripts.
 
 ## Screenshot
+<img width="654" height="600" alt="image" src="https://github.com/user-attachments/assets/35926efb-13df-438f-bab2-10f9ce3c15e8" />
